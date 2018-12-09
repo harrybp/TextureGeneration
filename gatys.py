@@ -74,14 +74,17 @@ def generate_texture(source, target, learning_rate, iterations, tileable=False, 
         optimizer.step()
 
         if save_intermediates:
+            if not os.path.exists('temp'):
+                os.makedirs('temp')
             current_image = to_PIL(de_normalise(noise_image.cpu()).clamp(0, 1))
             current_image.save('temp/' +  target  + str(i) + '.jpg')
             f=open("temp/gatys.txt", "a+")
             f.write("%d" % (0))
             f.close()
     
-    current_image = to_PIL(de_normalise(noise_image.cpu()).clamp(0, 1))
-    current_image.save(target + '.jpg')
+    if not save_intermediates:
+        current_image = to_PIL(de_normalise(noise_image.cpu()).clamp(0, 1))
+        current_image.save(target + '.jpg')
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Generate texture using gatys et al method.')

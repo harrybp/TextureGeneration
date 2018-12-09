@@ -95,6 +95,8 @@ def train_GAN(source_image, learning_rate, iterations, generator_name, resume=Fa
 
             if j % 16 == 0 and save_intermediates: #Run noise through generator to print current results
                 with torch.no_grad():
+                    if not os.path.exists('temp'):
+                        os.makedirs('temp')
                     count = count + 1
                     current_images = generator(noise[:4]).detach().cpu() #Get image batch
                     current_images = toPILImage(vutils.make_grid(current_images[:4], nrow=2, padding=1, normalize=True).cpu())
