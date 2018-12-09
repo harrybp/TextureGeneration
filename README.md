@@ -10,8 +10,8 @@ This method involves optimising on the pixels of a noise image. On each iteratio
 
 The textures produced can be tiled if specified. Below we can see the input image on the left and resulting tiled texture on the right.
 
-![Input image](http:http://harrybp.github.io/texture_images/gatys_input.jpg)
-![Resulting tiled texture](http:http://harrybp.github.io/texture_images/gatys_tiled.jpg)
+![Input image](http://harrybp.github.io/texture_images/gatys_input.jpg)
+![Resulting tiled texture](http://harrybp.github.io/texture_images/gatys_tiled.jpg)
 
 To run: `python gatys.py -h`
 
@@ -20,8 +20,8 @@ This method involves training a Deep Convolutional Generational Adversarial Netw
 
 Below we can see the input image and four examples of images created after training a GAN on 64 iterations over dataset of 16384 random crops.
 
-![Input image](http:http://harrybp.github.io/texture_images/GAN_input.jpg)
-![Resulting tiled texture](http:http://harrybp.github.io/texture_images/GAN_result.jpg)
+![Input image](http://harrybp.github.io/texture_images/GAN_input.jpg)
+![Resulting tiled texture](http://harrybp.github.io/texture_images/GAN_result.jpg)
 
 To run `python GAN.py -h`
 
