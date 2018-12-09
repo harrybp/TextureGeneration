@@ -6,20 +6,17 @@ import numpy as np
 import utils
 import PIL.Image, PIL.ImageTk
 import sys
-import utils
-from tkinter import *
-from tkinter import ttk
-from tkinter.ttk import Progressbar
 import torchvision.utils as vutils
 import matplotlib.pyplot as plt
 import torch.nn as nn
 import torch.optim as optim
 import os
+import argparse
 
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # Creates a texture image as done by gatys et al.
-def generate_texture(source, target, learning_rate, iterations, tileable=False):
+def generate_texture(source, target, learning_rate, iterations, tileable=False, save_intermediates=False):
     image_size = 256
     print('Generating texture file "%s" from source file "%s"' % (target, source))
 
@@ -45,7 +42,6 @@ def generate_texture(source, target, learning_rate, iterations, tileable=False):
 
     #Get target gram matrixes 
     layers = [0,5,10,19,28]
-    #weights = [200, 100, 50, 25, 12]
     weights = [10000, 128, 32, 4, 1]
     style_layers = utils.get_feature_layers(style_image, vgg16, layers)
     source_image_grams = utils.gram_matrix_layers(style_layers)
@@ -77,10 +73,22 @@ def generate_texture(source, target, learning_rate, iterations, tileable=False):
         loss.backward(retain_graph=True)
         optimizer.step()
 
-        
-        current_image = to_PIL(de_normalise(noise_image.cpu()).clamp(0, 1))
-        current_image.save('temp/' +  target  + str(i) + '.jpg')
-        f=open("temp/gatys.txt", "a+")
-        f.write("%d" % (0))
-        f.close()
+        if save_intermediates:
+            current_image = to_PIL(de_normalise(noise_image.cpu()).clamp(0, 1))
+            current_image.save('temp/' +  target  + str(i) + '.jpg')
+            f=open("temp/gatys.txt", "a+")
+            f.write("%d" % (0))
+            f.close()
     
+    current_image = to_PIL(de_normalise(noise_image.cpu()).clamp(0, 1))
+    current_image.save(target + '.jpg')
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Generate texture using gatys et al method.')
+    parser.add_argument('source',  help='the source image for texture style')
+    parser.add_argument('target',  help='the filename for the created image')
+    parser.add_argument('--lr', nargs='?', const=0.8, default=0.8, type=float, help='the learning rate for the optimiser')
+    parser.add_argument('--iter', nargs='?' , const=400, default=400, type=int, help='the number of iterations')
+    parser.add_argument('--tile', nargs='?' , const=False, default=False, type=bool, help='make the resulting texture tileable')
+    args = parser.parse_args()
+    generate_texture(args.source, args.target, args.lr, args.iter, tileable=args.tile)
