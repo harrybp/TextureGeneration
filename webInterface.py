@@ -31,8 +31,7 @@ def start_gatys():
     learning_rate = request.args.get('learning_rate')
     iterations = request.args.get('iterations')
     tile = bool(request.args.get('tile'))
-    print(tile)
-    gatys.generate_texture(source, target, float(learning_rate), int(iterations), tileable=tile)
+    gatys.generate_texture(source, target, float(learning_rate), int(iterations), tileable=tile, save_intermediates=True)
     return jsonify(success=True)
 
 #Call GAN demo method
@@ -56,7 +55,7 @@ def train_GAN():
     target = request.args.get('target')
     learning_rate = request.args.get('learning_rate')
     iterations = request.args.get('iterations')
-    GAN.train_GAN(source, float(learning_rate), int(iterations), target, resume == 'true', generator)
+    GAN.train_GAN(source, float(learning_rate), int(iterations), target, resume == 'true', generator, save_intermediates=True)
     return jsonify(success=True)
 
 #Return an image
