@@ -10,8 +10,8 @@ This method involves optimising on the pixels of a noise image. On each iteratio
 
 The textures produced can be tiled if specified. Below we can see the input image on the left and resulting tiled texture on the right.
 
-![Input image](http://harrybp.github.io/texture_images/gatys_input.jpg)
-![Resulting tiled texture](http://harrybp.github.io/texture_images/gatys_tiled.jpg)
+![Input image ](http://harrybp.github.io/texture_images/gatys_input2.jpg) 
+![Resulting tiled texture ](http://harrybp.github.io/texture_images/g2atys_tiled.jpg)
 
 To run: `python gatys.py -h`
 
