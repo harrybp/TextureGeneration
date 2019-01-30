@@ -16,21 +16,22 @@ import argparse
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # Creates a texture image as done by gatys et al.
-def generate_texture(source, target, learning_rate, iterations, tileable=False, save_intermediates=False):
-    image_size = 256
+def generate_texture(source, target, learning_rate, iterations, image_size=128, tileable=False, save_intermediates=False):
+    utils.update_progress(0)
     print('Generating texture file "%s" from source file "%s"' % (target, source))
 
     #Transforms to normalise in the same way as the images vgg was trained on
     normalise = transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
     de_normalise = transforms.Normalize((-2.12, -2.04, -1.80), (4.37, 4.46, 4.44))
     #Transforms to switch from Tensor to PIL Image
-    to_Tensor = transforms.Compose([transforms.Resize((image_size,image_size)),transforms.ToTensor()])
+    to_Tensor = transforms.Compose([transforms.RandomCrop((image_size,image_size)),transforms.ToTensor()])
     to_PIL = transforms.Compose([transforms.ToPILImage()])
 
     cnn = models.vgg16(pretrained=True).features.eval() #Load in pretrained CNN
     cuda = torch.device('cuda') #Can change to cpu if you dont have CUDA
 
     #Read in source image and noise image as Tensors and normalise
+    #crop = transforms.RandomCrop(256)
     style_image = normalise(to_Tensor(PIL.Image.open(source).convert("RGB")))
     imarray = np.random.rand(image_size,image_size,3) * 255
     noise_image = normalise(to_Tensor(PIL.Image.fromarray(imarray.astype('uint8')).convert('RGB')))
@@ -76,17 +77,20 @@ def generate_texture(source, target, learning_rate, iterations, tileable=False, 
         if save_intermediates:
             if not os.path.exists('temp'):
                 os.makedirs('temp')
+            if not os.path.exists('temp/gatys'):
+                os.makedirs('temp/gatys')
             current_image = to_PIL(de_normalise(noise_image.cpu()).clamp(0, 1))
-            current_image.save('temp/' +  target  + str(i) + '.jpg')
-            f=open("temp/gatys.txt", "a+")
-            f.write("%d" % (0))
-            f.close()
+            current_image.save('temp/gatys/' +  target  +'.jpg')
+            utils.update_progress(int( (100/iterations) * i ) + 1)
+            #f=open("temp/gatys/progress.txt", "a+")
+            #f.write("%d" % (0))
+            #f.close()
     
     if not save_intermediates:
         current_image = to_PIL(de_normalise(noise_image.cpu()).clamp(0, 1))
         current_image.save(target + '.jpg')
 
-if __name__ == "__main__":
+'''if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Generate texture using gatys et al method.')
     parser.add_argument('source',  help='the source image for texture style')
     parser.add_argument('target',  help='the filename for the created image')
@@ -94,4 +98,4 @@ if __name__ == "__main__":
     parser.add_argument('--iter', nargs='?' , const=400, default=400, type=int, help='the number of iterations')
     parser.add_argument('--tile', nargs='?' , const=False, default=False, type=bool, help='make the resulting texture tileable')
     args = parser.parse_args()
-    generate_texture(args.source, args.target, args.lr, args.iter, tileable=args.tile)
+    generate_texture(args.source, args.target, args.lr, args.iter, tileable=args.tile)'''

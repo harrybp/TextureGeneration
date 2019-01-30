@@ -3,9 +3,83 @@ import numpy as np
 import random
 from PIL import Image
 import torchvision.transforms as transforms
+import torchvision.datasets
 from torch.utils.data import Dataset, DataLoader
 import torch.nn as nn
 import torch.nn.functional as F
+import sqlite3
+
+#Add a GAN to the database
+def save_GAN(name, source, iterations, lr, width, height):
+    try:
+        with sqlite3.connect("database.db") as con:
+            con.row_factory = sqlite3.Row
+            cur = con.cursor()
+            cur.execute("INSERT INTO gans (name,sourceimg,iterations,lr,width,height) VALUES (?,?,?,?,?,?)", (name,source,iterations,lr,width,height) )
+            con.commit()
+            msg = "Added to Database"
+    except:
+        con.rollback()
+        msg = "Error adding to Database"
+    finally:
+        print(msg)
+        con.close()
+
+#Get list of all trained GANs in database
+def get_GANS():
+    con = sqlite3.connect("database.db")
+    cur = con.cursor()
+    query = 'SELECT name, MAX(iterations) FROM gans GROUP BY name'
+    cur.execute(query)
+    rows = cur.fetchall()
+    return rows
+
+def update_progress(progress):
+    try:
+        with sqlite3.connect("database.db") as con:
+            con.row_factory = sqlite3.Row
+            cur = con.cursor()
+            cur.execute('UPDATE gatys SET progress = ' + str(progress) + ' WHERE current = "gatys"')
+            con.commit()
+            msg = "Added to Database"
+    except:
+        con.rollback()
+        msg = "Error adding to Database"
+    finally:
+        print(msg)
+        con.close()
+
+def update_progress_gan(progress):
+    try:
+        with sqlite3.connect("database.db") as con:
+            con.row_factory = sqlite3.Row
+            cur = con.cursor()
+            cur.execute('UPDATE gans_progress SET progress = ' + str(progress) + ' WHERE current = "gans"')
+            con.commit()
+            msg = "Added to Database"
+    except:
+        con.rollback()
+        msg = "Error adding to Database"
+    finally:
+        print(msg)
+        con.close()
+
+def get_progress_gan():
+    con = sqlite3.connect("database.db")
+    cur = con.cursor()
+    query = 'SELECT progress FROM gans_progress WHERE current = "gans"'
+    cur.execute(query)
+    rows = cur.fetchall()
+    return int(rows[0][0])
+
+def get_progress():
+    con = sqlite3.connect("database.db")
+    cur = con.cursor()
+    query = 'SELECT progress FROM gatys WHERE current = "gatys"'
+    cur.execute(query)
+    rows = cur.fetchall()
+    return int(rows[0][0])
+    
 
 # Takes a source image tensor, cut some off the bottom and append to the top
 def tile_vertical(source):
@@ -71,10 +145,38 @@ def get_feature_layers(input, cnn, layers_select):
     return features
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# Get dataloader for a folder of images
+def get_folder_dataloader(folder_path, image_size, batch_size=64):
+    transform = transforms.Compose([
+            transforms.Resize(image_size),
+            transforms.RandomCrop(image_size),
+            transforms.ToTensor(),
+            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        ])
+    dataset = torchvision.datasets.ImageFolder(root=folder_path, transform=transform)
+    dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=4)
+    return dataloader
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# Get a dataloader for a single image (random crops)
+def get_image_dataloader(image_path, image_size, dataset_size=4096, batch_size=64):
+    dataset = TextureDataset(
+        image_size=image_size,
+        size=dataset_size,
+        image_path=image_path,
+        transform=transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+        ]))
+    dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=4)
+    return dataloader
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # Create a dataset of n randomly cropped images from a source image
+# TODO: handle resize better
 class TextureDataset(Dataset):
     def __init__(self, image_size, size, image_path, transform=None):
-        self.image = Image.open(image_path)
+        self.image = Image.open(image_path)#.resize((400,400), Image.ANTIALIAS)
         self.transform = transform
         self.size = size
         self.image_size = image_size
