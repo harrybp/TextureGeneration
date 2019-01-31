@@ -12,41 +12,41 @@ import torch.nn as nn
 import torch.optim as optim
 import os
 import argparse
+import database
 
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # Creates a texture image as done by gatys et al.
-def generate_texture(source, target, learning_rate, iterations, image_size=128, tileable=False, save_intermediates=False):
-    utils.update_progress(0)
+def generate_texture(source, target, learning_rate, iterations, image_size=128, tileable=False, save_intermediates=True, cuda=True):
     print('Generating texture file "%s" from source file "%s"' % (target, source))
+    database.update_progress(0, 'gatys')
+    
 
-    #Transforms to normalise in the same way as the images vgg was trained on
-    normalise = transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
-    de_normalise = transforms.Normalize((-2.12, -2.04, -1.80), (4.37, 4.46, 4.44))
-    #Transforms to switch from Tensor to PIL Image
-    to_Tensor = transforms.Compose([transforms.RandomCrop((image_size,image_size)),transforms.ToTensor()])
-    to_PIL = transforms.Compose([transforms.ToPILImage()])
+    #Define gatys-specific transforms
+    vgg_de_normalise = transforms.Normalize((-2.12, -2.04, -1.80), (4.37, 4.46, 4.44))
+    process_image = transforms.Compose([
+        transforms.RandomCrop((image_size,image_size)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)) #Normalised same as images vgg was trained on
+    ])
 
-    cnn = models.vgg16(pretrained=True).features.eval() #Load in pretrained CNN
-    cuda = torch.device('cuda') #Can change to cpu if you dont have CUDA
+    if cuda:
+        device = torch.device('cuda') #Can change to cpu if you dont have device
+    else:
+        device = torch.device('cpu')
 
+    vgg16 = models.vgg16(pretrained=True).features.eval().to(device) #Load in pretrained CNN
     #Read in source image and noise image as Tensors and normalise
-    #crop = transforms.RandomCrop(256)
-    style_image = normalise(to_Tensor(PIL.Image.open(source).convert("RGB")))
-    imarray = np.random.rand(image_size,image_size,3) * 255
-    noise_image = normalise(to_Tensor(PIL.Image.fromarray(imarray.astype('uint8')).convert('RGB')))
-
-    #Move everything to GPU
-    style_image = style_image.to(cuda)
-    noise_image = noise_image.to(cuda)
-    vgg16 = cnn.to(cuda)
+    style_image = process_image(PIL.Image.open(source).convert("RGB")).to(device)
+    noise = np.random.rand(image_size,image_size,3) * 255
+    noise_image = process_image(PIL.Image.fromarray(noise.astype('uint8')).convert('RGB')).to(device)
 
     #Get target gram matrixes 
     layers = [0,5,10,19,28]
     weights = [10000, 128, 32, 4, 1]
-    style_layers = utils.get_feature_layers(style_image, vgg16, layers)
-    source_image_grams = utils.gram_matrix_layers(style_layers)
-    layer_sizes = utils.get_layer_sizes(style_layers)
+    style_layers = get_feature_layers(style_image, vgg16, layers)
+    source_image_grams = gram_matrix_layers(style_layers)
+    layer_sizes = get_layer_sizes(style_layers)
     
     #Set up optimiser
     noise_image.requires_grad = True
@@ -63,32 +63,67 @@ def generate_texture(source, target, learning_rate, iterations, image_size=128, 
         if tileable:
             noise_image_v = utils.tile_vertical(noise_image) #Randomly tile the image vertically
             noise_image_h = utils.tile_horizontal(noise_image_v) # and horizontally
-            noise_layers = utils.get_feature_layers(noise_image_h, vgg16, layers)   
+            noise_layers = get_feature_layers(noise_image_h, vgg16, layers)   
         else:
-            noise_layers = utils.get_feature_layers(noise_image, vgg16, layers)
-
-        noise_grams = utils.gram_matrix_layers(noise_layers)
+            noise_layers = get_feature_layers(noise_image, vgg16, layers)
+        noise_grams = gram_matrix_layers(noise_layers)
 
         #Calculate the loss and backpropogate
-        loss = utils.get_style_loss(noise_grams, source_image_grams, layer_sizes, weights)
+        loss = get_style_loss(noise_grams, source_image_grams, layer_sizes, weights)
         loss.backward(retain_graph=True)
         optimizer.step()
 
-        if save_intermediates:
-            if not os.path.exists('temp'):
-                os.makedirs('temp')
-            if not os.path.exists('temp/gatys'):
-                os.makedirs('temp/gatys')
-            current_image = to_PIL(de_normalise(noise_image.cpu()).clamp(0, 1))
-            current_image.save('temp/gatys/' +  target  +'.jpg')
-            utils.update_progress(int( (100/iterations) * i ) + 1)
-            #f=open("temp/gatys/progress.txt", "a+")
-            #f.write("%d" % (0))
-            #f.close()
-    
-    if not save_intermediates:
-        current_image = to_PIL(de_normalise(noise_image.cpu()).clamp(0, 1))
-        current_image.save(target + '.jpg')
+        if save_intermediates or i == iterations-1:
+            current_image = utils.to_pil_image(vgg_de_normalise(noise_image.cpu()).clamp(0, 1))
+            current_image.save('temp/' +  target  +'.jpg')
+            database.update_progress(int( (100/iterations) * i ) + 1, 'gatys')
+
+#Calculate the gram matrix of a single layer
+def gram_matrix(layer):
+    c, h, w = layer.size()
+    layer = layer.view(c, h * w)
+    gram = torch.mm(layer, layer.t())
+    return gram
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# Calculate the gram matrix for each layer of a cnn
+def gram_matrix_layers(layers):
+    targets = []
+    for i in range(len(layers)):
+        gram = gram_matrix(layers[i])
+        targets.append(gram)
+    return targets
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# Get the number of variables in each layer
+def get_layer_sizes(layers):
+    sizes = []
+    for i, layer in enumerate(layers):
+        c, h, w = layer.size()
+        sizes.append(c*h*w)
+    return sizes
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# Get style loss by comparing two Gram Matrix's
+def get_style_loss(grams1, grams2, layer_sizes, weights):
+    style_loss = 0
+    for i in range(len(grams1)): #for now
+        gram1 = grams1[i]
+        gram2 = grams2[i]
+        style_loss += weights[i] * torch.mean((gram1 - gram2)**2) / layer_sizes[i]
+    return style_loss
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# Run an input image through the cnn and extract feature map from each layer
+def get_feature_layers(input, cnn, layers_select):
+    features = []
+    prev_feature = input.unsqueeze(0)
+    for i, module in enumerate(cnn):
+        feature = module(prev_feature)
+        if(i in layers_select):
+            features.append(feature.squeeze(0))
+        prev_feature = feature
+    return features
 
 '''if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Generate texture using gatys et al method.')
