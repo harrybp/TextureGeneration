@@ -12,38 +12,39 @@ import torch.nn as nn
 import torch.optim as optim
 import os
 import argparse
-import database
 
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # Creates a texture image as done by gatys et al.
-def generate_texture(source, target, learning_rate, iterations, image_size=128, tileable=False, save_intermediates=True, cuda=True):
+def generate_texture(source, target, learning_rate, iterations, image_size=124, tileable=False, save_intermediates=True, cuda=True):
     print('Generating texture file "%s" from source file "%s"' % (target, source))
-    database.update_progress(0, 'gatys')
-    
 
-    #Define gatys-specific transforms
-    vgg_de_normalise = transforms.Normalize((-2.12, -2.04, -1.80), (4.37, 4.46, 4.44))
-    process_image = transforms.Compose([
-        transforms.RandomCrop((image_size,image_size)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)) #Normalised same as images vgg was trained on
-    ])
+    #Transforms to normalise in the same way as the images vgg was trained on
+    normalise = transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
+    de_normalise = transforms.Normalize((-2.12, -2.04, -1.80), (4.37, 4.46, 4.44))
+    #Transforms to switch from Tensor to PIL Image
+    crop = transforms.RandomCrop((256,256))
+    to_Tensor = transforms.Compose([transforms.Resize((image_size,image_size)),transforms.ToTensor()])
+    to_PIL = transforms.Compose([transforms.ToPILImage()])
 
+    cnn = models.vgg16(pretrained=True).features.eval() #Load in pretrained CNN
     if cuda:
-        device = torch.device('cuda') #Can change to cpu if you dont have device
+        cuda = torch.device('cuda') #Can change to cpu if you dont have CUDA
     else:
-        device = torch.device('cpu')
-
-    vgg16 = models.vgg16(pretrained=True).features.eval().to(device) #Load in pretrained CNN
+        cuda = torch.device('cpu')
     #Read in source image and noise image as Tensors and normalise
-    style_image = process_image(PIL.Image.open(source).convert("RGB")).to(device)
-    noise = np.random.rand(image_size,image_size,3) * 255
-    noise_image = process_image(PIL.Image.fromarray(noise.astype('uint8')).convert('RGB')).to(device)
+    style_image = normalise(to_Tensor(crop(PIL.Image.open(source).convert("RGB"))))
+    imarray = np.random.rand(image_size,image_size,3) * 255
+    noise_image = normalise(to_Tensor(PIL.Image.fromarray(imarray.astype('uint8')).convert('RGB')))
+
+    #Move everything to GPU
+    style_image = style_image.to(cuda)
+    noise_image = noise_image.to(cuda)
+    vgg16 = cnn.to(cuda)
 
     #Get target gram matrixes 
     layers = [0,5,10,19,28]
-    weights = [10000, 128, 32, 4, 1]
+    weights = [200, 100, 50, 25, 12]
     style_layers = get_feature_layers(style_image, vgg16, layers)
     source_image_grams = gram_matrix_layers(style_layers)
     layer_sizes = get_layer_sizes(style_layers)
@@ -51,21 +52,16 @@ def generate_texture(source, target, learning_rate, iterations, image_size=128, 
     #Set up optimiser
     noise_image.requires_grad = True
     optimizer = torch.optim.Adam([noise_image], lr=learning_rate) #Set up the optimizer
-    
+    saved_images = 0
     for i in range(iterations):
         sys.stdout.write('\rIteration %d / %d' % (i+1, iterations))
         sys.stdout.flush()
-        
+
         noise_image.clamp(-1.5, 1.5)
         optimizer.zero_grad() #Reset all gradients for each iteration
 
         #Get the gram matrix's for the noise image
-        if tileable:
-            noise_image_v = utils.tile_vertical(noise_image) #Randomly tile the image vertically
-            noise_image_h = utils.tile_horizontal(noise_image_v) # and horizontally
-            noise_layers = get_feature_layers(noise_image_h, vgg16, layers)   
-        else:
-            noise_layers = get_feature_layers(noise_image, vgg16, layers)
+        noise_layers = get_feature_layers(noise_image, vgg16, layers)
         noise_grams = gram_matrix_layers(noise_layers)
 
         #Calculate the loss and backpropogate
@@ -73,10 +69,16 @@ def generate_texture(source, target, learning_rate, iterations, image_size=128, 
         loss.backward(retain_graph=True)
         optimizer.step()
 
-        if save_intermediates or i == iterations-1:
-            current_image = utils.to_pil_image(vgg_de_normalise(noise_image.cpu()).clamp(0, 1))
-            current_image.save('temp/' +  target  +'.jpg')
-            database.update_progress(int( (100/iterations) * i ) + 1, 'gatys')
+        if save_intermediates:
+            with torch.no_grad():
+                if i < 50 or (i < 100 and i % 5 == 0) or (i % 10 == 0):
+                    current_image = to_PIL(de_normalise(noise_image.cpu()).clamp(0, 1))
+                    current_image.save(target + str(saved_images) + '.jpg')
+                    saved_images+=1
+    
+    if not save_intermediates:
+        result = to_PIL(de_normalise(noise_image.cpu()).clamp(0, 1))
+        result.save(target + '.jpg')
 
 #Calculate the gram matrix of a single layer
 def gram_matrix(layer):
@@ -125,12 +127,14 @@ def get_feature_layers(input, cnn, layers_select):
         prev_feature = feature
     return features
 
-'''if __name__ == "__main__":
+if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Generate texture using gatys et al method.')
     parser.add_argument('source',  help='the source image for texture style')
     parser.add_argument('target',  help='the filename for the created image')
     parser.add_argument('--lr', nargs='?', const=0.8, default=0.8, type=float, help='the learning rate for the optimiser')
-    parser.add_argument('--iter', nargs='?' , const=400, default=400, type=int, help='the number of iterations')
+    parser.add_argument('--iter', nargs='?' , const=150, default=150, type=int, help='the number of iterations')
     parser.add_argument('--tile', nargs='?' , const=False, default=False, type=bool, help='make the resulting texture tileable')
     args = parser.parse_args()
-    generate_texture(args.source, args.target, args.lr, args.iter, tileable=args.tile)'''
+    generate_texture(args.source, args.target, args.lr, args.iter, tileable=args.tile, save_intermediates=False)
+
+

@@ -1,4 +1,6 @@
 import torch.nn as nn
+import torch
+import numpy as np
 
 class PSGenerator(nn.Module):
     def __init__(self, channels=[64, 512, 256, 128, 64, 3], kernel_size=4):
@@ -25,6 +27,15 @@ class PSGenerator(nn.Module):
 
     def forward(self, input):
         return self.generate(input)
+
+    def noise(self, batch_size, image_size, tile=False):
+        noise =- torch.Tensor(np.random.uniform(-1, 1, (batch_size, 64, int(image_size/32), int(image_size/32)))) #Generate batch of noise for input
+        if tile:
+            noise_array = torch.cat((noise, noise), 2)
+            noise = torch.cat((noise_array, noise_array), 3) #Make grid of identical noise
+        return noise
+
+    
 
 
 class PSDiscriminator(nn.Module):
@@ -57,3 +68,59 @@ class PSDiscriminator(nn.Module):
     def forward(self, input):
         result = self.discriminate(input)
         return result.view(result.shape[0], result.shape[2]*result.shape[2])
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# The following generator and discriminator implementations are taken from
+# https://github.com/pytorch/examples/tree/master/dcgan
+# Create a Generator CNN, which takes a 1D input vector and produces an image
+class DCGenerator(nn.Module):
+    def __init__(self, input_size, image_size, channels):
+        super(DCGenerator, self).__init__()
+        self.main = nn.Sequential(
+            nn.ConvTranspose2d( input_size, image_size * 8, 4, 1, 0, bias=False),
+            nn.BatchNorm2d(image_size * 8),
+            nn.ReLU(True), 
+            nn.ConvTranspose2d(image_size * 8, image_size * 4, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(image_size * 4),
+            nn.ReLU(True), 
+            nn.ConvTranspose2d( image_size * 4, image_size * 2, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(image_size * 2),
+            nn.ReLU(True), 
+            nn.ConvTranspose2d( image_size * 2, image_size, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(image_size),
+            nn.ReLU(True),
+            nn.ConvTranspose2d( image_size, channels, 4, 2, 1, bias=False),
+            nn.Tanh()
+        )
+
+    def forward(self, input):
+        return self.main(input)
+    
+    def noise(self, batch_size, image_size):
+            return torch.randn(batch_size, 100, 1, 1) #Generate batch of noise for input
+
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# Create a Discriminator CNN, which takes an image as 
+#   input and returns a 0 (fake) or 1 (real)    
+class DCDiscriminator(nn.Module):
+    def __init__(self, image_size, channels):
+        super(DCDiscriminator, self).__init__()
+        self.main = nn.Sequential(
+            nn.Conv2d(channels, image_size, 4, 2, 1, bias=False),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(image_size, image_size * 2, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(image_size * 2),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(image_size * 2, image_size * 4, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(image_size * 4),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(image_size * 4, image_size * 8, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(image_size * 8),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(image_size * 8, 1, 4, 1, 0, bias=False),
+            nn.Sigmoid()
+        )
+
+    def forward(self, input):
+        return self.main(input)

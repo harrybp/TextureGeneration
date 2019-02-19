@@ -22,7 +22,6 @@ def crop_texture_images():
             cropped = crop(texture)
             cropped.save('textures/cropped/' + file)
 
-
 # Takes a source image tensor, cut some off the bottom and append to the top
 def tile_vertical(source):
     size = source.shape[1]
@@ -54,18 +53,31 @@ def get_folder_dataloader(folder_path, image_size, batch_size=64):
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # Get a dataloader for a single image (random crops)
-def get_image_dataloader(image_path, image_size, dataset_size=4096, batch_size=64):
+#Image size = size of the crop taken
+# Image will then be scaled by dividing by imageresize
+def get_image_dataloader(image_path, image_size, image_resize=1, dataset_size=4096, batch_size=64):
     dataset = TextureDataset(
         image_size=image_size,
         size=dataset_size,
         image_path=image_path,
         transform=transforms.Compose([
+            transforms.Resize((int(image_size/image_resize), int(image_size/image_resize))),
             transforms.ToTensor(),
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
         ]))
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=4)
     return dataloader
 
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# Initialise weights for GAN as done in https://arxiv.org/pdf/1511.06434.pdf
+def initialise_weights(layer):
+    classname = layer.__class__.__name__
+    if classname.find('Conv') != -1:
+        nn.init.normal_(layer.weight.data, 0.0, 0.02)
+    elif classname.find('BatchNorm') != -1:
+        nn.init.normal_(layer.weight.data, 1.0, 0.02)
+        nn.init.constant_(layer.bias.data, 0)
+        
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # Create a dataset of n randomly cropped images from a source image
 # TODO: handle resize better
