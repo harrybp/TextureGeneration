@@ -18,17 +18,18 @@ device = torch.device('cuda') #Can change to cpu if you dont have CUDA
 #       - generator_name:   models will be saved under this name
 #       - iterations:       Total number of images fed trained on
 #       - batch_size:       How many images to operate on at once
-def train_ps_gan(source_image, image_size, generator_name, iterations=44000, batch_size=8, resume_from=None):
+#       - resume_from:      Path to a folder containing checkpoints to resume from, (or None)
+def train_ps_gan(source_image, image_size, generator_name, iterations=44000, batch_size=8, image_resize=1, resume_from=None):
     generator = models.PSGenerator()
     discriminator = models.PSDiscriminator()
-    dataloader = utils.get_image_dataloader(source_image, 2048, image_resize=8, batch_size=batch_size)
+    dataloader = utils.get_image_dataloader(source_image, image_size, image_resize=image_resize, batch_size=batch_size)
     params = {
         'dataloader':           dataloader,
         'generator':            generator.to(device),
         'discriminator':        discriminator.to(device),
         'generator_optim':      torch.optim.Adam(generator.parameters(), lr=5e-5, weight_decay=1e-8, betas=(0.5, 0.999)),
         'discriminator_optim':  torch.optim.Adam(discriminator.parameters(), lr=5e-5, weight_decay=1e-8, betas=(0.5, 0.999)),
-        'image_size':           image_size,
+        'image_size':           image_size / image_resize,
         'batch_size':           batch_size,
         'save_path':            generator_name + '/ps/',
         'iterations':           iterations,
@@ -60,6 +61,41 @@ def train_dc_gan(source_image, generator_name, iterations=44000, batch_size=8):
     }
     train_GAN(**params)
 
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+#   Generate an image using pretrained ps_gan
+#       If checkpoint = -1, most recent checkpoint is used
+def demo_ps_gan(name, image_size=256, checkpoint=-1, tile=False):
+    transform = None
+    if tile:
+        transform = transforms.CenterCrop((image_size, image_size))
+    root_directory = 'models/' + name + '/ps'
+    if checkpoint < 0:
+        checkpoint = 0
+        for root, dirs, files in os.walk(root_directory):
+            checkpoint += len(dirs)
+    root_directory = root_directory + '/' + str(checkpoint)
+    generator = models.PSGenerator().to(device)
+    generator.load_state_dict(torch.load(root_directory + '/generator.pt'))
+    noise = generator.noise(1, image_size, tile=tile).to(device)
+    generate_image(generator, 'result.jpg', noise, transform=transform)
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+#   Generate an image using a pretrained dc_gan
+#       If checkpoint = -1, most recent checkpoint is used
+def demo_dc_gan(name, checkpoint=-1):
+    root_directory = 'models/' + name + '/dc'
+    if checkpoint < 0:
+        checkpoint = 0
+        for root, dirs, files in os.walk(root_directory):
+            checkpoint += len(dirs)
+    root_directory = root_directory + '/' + str(checkpoint)
+    generator = models.DCGenerator(100,64,3).to(device)
+    generator.load_state_dict(torch.load(root_directory + '/generator.pt'))
+    noise = generator.noise(4, 64).to(device)
+    generate_image(generator, 'result.jpg', noise)
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# Resume models and optimisers from specified folder 
 def resume(file_path, generator, discriminator, generator_optim, discriminator_optim):
     generator.load_state_dict(torch.load(file_path + '/generator.pt'))
     discriminator.load_state_dict(torch.load(file_path + '/discriminator.pt'))
@@ -135,7 +171,7 @@ def train_GAN(dataloader, generator, discriminator, generator_optim, discriminat
                     save_checkpoint(save_path, saves, generator, discriminator, generator_optim, discriminator_optim, just_generator=True)
                 noise = generator.noise(1, image_size).to(device)
                 with torch.no_grad():
-                    demonstrate_gan(generator, 'in_progress.jpg', noise)
+                    generate_image(generator, 'in_progress.jpg', noise)
                 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #   Saves the models to 'models / generator_name / checkpoint_number' directory
@@ -165,7 +201,7 @@ def save_checkpoint(generator_name, checkpoint_number, generator, discriminator,
 #       - generator:    the generator to be demo'd
 #       - filepath:     filepath of the generated image
 #       - noise:        the noise vector to be used as generator input
-def demonstrate_gan(generator, filepath, noise, transform=None):
+def generate_image(generator, filepath, noise, transform=None):
     normalise = transforms.Normalize(mean=[-1, -1, -1], std=[2, 2, 2])
     result = generator(noise).detach().cpu()
     if result.shape[0] > 1:
@@ -179,81 +215,42 @@ def demonstrate_gan(generator, filepath, noise, transform=None):
         result = transform(result)
     result.save(filepath, quality=60)
 
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-# Saves an image generated by every checkpoint of a trained generator or just final checkpoint
-# Input:
-#       - noise:                    the noise vector to be used as input for the generator checpoints
-#       - generator_save_directory: the base directory where all checkpoints are saved for the model
-#       - generator:                the generator to use
-#       - save_directory:           the directory in which to save the generated images
-#       - image_size:               the size of the generated images
-#       - final_only:               if True only one image is generated using final checkpoint
-def visualise(noise, generator_save_directory, generator, save_directory, transform=None, final_only=True):
-    iterations = 0
-    for root, dirs, files in os.walk(generator_save_directory):
-        iterations += len(dirs) #Count number of checkpoints in directory
-    for i in range(iterations):
-        if not final_only or i == iterations-1:
-            generator.load_state_dict(torch.load(generator_save_directory + '/' + str(i+1) + '/generator.pt'))
-            demonstrate_gan(generator, save_directory + '/' + str(i) + '.jpg', noise, transform)
-def visualise_ps_gan(generator_name, save_directory, image_size, tile=False, final_only=True):
-    noise = ps_noise(1, image_size, tile=tile)
-    transform = None
-    if tile:
-        transform = transforms.CenterCrop((image_size, image_size))
-    generator = models.PSGenerator().to(device)
-    visualise(noise, 'models/' + generator_name + '/ps', generator, save_directory, transform, final_only)
-def visualise_dc_gan(generator_name, save_directory, final_only=True):
-    generator = models.DCGenerator(100, 64, 3).to(device)
-    noise = dc_noise(4, 64)
-    visualise(noise, 'models/' + generator_name + '/dc', generator, save_directory, None, final_only)
 
 
 if __name__ == '__main__':
-    #generator = models.PSGenerator().to(device)
-    #generator.load_state_dict(torch.load('models/kilburn/ps/383/generator.pt'))
-    #noise = ps_noise(1, 512, True)
-    #transform = transforms.CenterCrop((512, 512))
-    #demonstrate_gan(generator, 'yee.jpg', noise, transform=transform)
-    # visualise_ps_gan('pebbles', 'images/boop', 256, tile=True)
-    train_ps_gan('textures/kilburn.jpg', 128, 'kilburn', batch_size=64, iterations=120000)
-     #images = ['snake', 'pebbles', 'water', 'lava', 'camo', 'painting', 'check']#,'bricks']
-    #for image in images:
-    #    print(image)
-        #train_dc_gan('textures/'+ image +'.jpg', 'dc_' + image)
-    #    visualise_dc_gan('dc_' + image, 'images/' + image + '/dc')
+    parser = argparse.ArgumentParser(prog="Train and demonstrate GANs for texture generation.")
+    subparsers = parser.add_subparsers(title="actions", help="train new GAN or demo existing GAN", dest='action')
 
+    #Train new GAN
+    parser_train = subparsers.add_parser("train", help = "train new GAN")
+    parser_train.add_argument('model',  help='GAN model to use, either "ps" or "dc"')
+    parser_train.add_argument('source',  help='path to the source image')
+    parser_train.add_argument('name',  help='checkpoints will be saved under this name')
+    parser_train.add_argument('--image_size', nargs='?', const=256, default=256, type=int,   help='size of image to train on')
+    parser_train.add_argument('--batch_size', nargs='?', const=8, default=8, type=int, help='how many images to train on concurrently')
+    parser_train.add_argument('--iterations', nargs='?' , const=44000, default=44000, type=int, help='the number of iterations over the training data')
 
-
-'''
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Generate texture using gatys et al method.')
-    parser.add_argument('source',  help='the source image for texture style')
-    parser.add_argument('target',  help='the filename for the created image')
-    parser.add_argument('--lr', nargs='?', const=0.8, default=0.8, type=float, help='the learning rate for the optimiser')
-    parser.add_argument('--iter', nargs='?' , const=150, default=150, type=int, help='the number of iterations')
-    parser.add_argument('--tile', nargs='?' , const=False, default=False, type=bool, help='make the resulting texture tileable')
+    #Demo GAN
+    parser_update = subparsers.add_parser ("demo", help = "demo existing")
+    parser_update.add_argument('model',  help='GAN model to use, either "ps" or "dc"')
+    parser_update.add_argument('source',  help='the name of the trained GAN to demo')
+    parser_update.add_argument('--image_size', nargs='?', const=256, default=256, type=int, help='size of the generated image (where applicable)')
+    parser_update.add_argument('--checkpoint', nargs='?', const=-1, default=-1, type=int, help='choose a specific saved checkpoint')
+    parser_update.add_argument('--tile', nargs='?', const=False, default=False, type=bool, help='True if the generated image should be tileable (where applicable)')
     args = parser.parse_args()
-    generate_texture(args.source, args.target, args.lr, args.iter, tileable=args.tile, save_intermediates=False)'''
 
-'''
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-# Loads a given generator and generates an images
-def demonstrate_GAN(generator_filepath, saved_image_filepath='temp/GAN_demo.jpg', image_size=128, tile=False, noise=None):
-    center_crop = transforms.CenterCrop((image_size, image_size))
-    normalise = transforms.Normalize(mean=[-1, -1, -1], std=[2, 2, 2])
-
-    generator = models.PSGenerator()
-    generator.load_state_dict(torch.load(generator_filepath))
-    if noise is None:
-        noise_size = int(image_size / 32)
-        noise = torch.Tensor(np.random.uniform(-1, 1, (64, noise_size, noise_size)))
-    if tile:
-        noise_array = torch.cat((noise, noise), 1)
-        noise = torch.cat((noise_array, noise_array), 2) #Make grid of identical noise
-    result = generator(noise.unsqueeze(0)).detach().squeeze()
-    result = utils.to_pil_image(normalise(result))
-    if tile:
-        result = center_crop(result)
-    #result.save(saved_image_filepath, optimize=True,quality=60)
-    result.save(saved_image_filepath, optimize=True,quality=60)'''
+    if args.action == 'train':
+        print('Model %s, Src %s, Name %s, size %d, batch %d, iters %d' % (args.model, args.source, args.name, args.image_size, args.batch_size, args.iterations))
+        if args.model == 'ps':
+            gan.train_ps_gan(args.source, args.image_size, args.name, args.iterations, args.batch_size)
+        elif args.model == 'dc':
+            gan.train_dc_gan(args.source, args.name, args.iterations, args.batch_size)
+        else:
+            print('Please select a valid GAN model (ps/dc)')
+    elif args.action == 'demo':
+        if args.model == 'ps':
+            gan.demo_ps_gan(args.source, args.image_size, args.checkpoint, args.tile)
+        elif args.model == 'dc':
+            gan.train_dc_gan(args.source, args.checkpoint)
+        else:
+            print('Please select a valid GAN model (ps/dc)')

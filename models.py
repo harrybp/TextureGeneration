@@ -2,6 +2,14 @@ import torch.nn as nn
 import torch
 import numpy as np
 
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# GAN MODELS
+# Generators and Discriminators need a 'forward' method
+# Generators should provide a method for generating the input noise vector 'noise(batch_size, image_size)'
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# Generator for Periodic-Spatial GAN
+# https://arxiv.org/pdf/1705.06566.pdf
 class PSGenerator(nn.Module):
     def __init__(self, channels=[64, 512, 256, 128, 64, 3], kernel_size=4):
         super(PSGenerator, self).__init__()
@@ -35,9 +43,9 @@ class PSGenerator(nn.Module):
             noise = torch.cat((noise_array, noise_array), 3) #Make grid of identical noise
         return noise
 
-    
-
-
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# Discriminator for Periodic-Spatial GAN
+# https://arxiv.org/pdf/1705.06566.pdf
 class PSDiscriminator(nn.Module):
     def __init__(self, channels=[3, 64, 128, 256, 512, 1], kernel_size=4):
         super(PSDiscriminator, self).__init__()
@@ -70,9 +78,8 @@ class PSDiscriminator(nn.Module):
         return result.view(result.shape[0], result.shape[2]*result.shape[2])
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-# The following generator and discriminator implementations are taken from
+# Generator for Deep Convolutional GAN
 # https://github.com/pytorch/examples/tree/master/dcgan
-# Create a Generator CNN, which takes a 1D input vector and produces an image
 class DCGenerator(nn.Module):
     def __init__(self, input_size, image_size, channels):
         super(DCGenerator, self).__init__()
@@ -101,8 +108,8 @@ class DCGenerator(nn.Module):
 
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-# Create a Discriminator CNN, which takes an image as 
-#   input and returns a 0 (fake) or 1 (real)    
+# Discriminator for Deep Convolutional GAN
+# https://github.com/pytorch/examples/tree/master/dcgan 
 class DCDiscriminator(nn.Module):
     def __init__(self, image_size, channels):
         super(DCDiscriminator, self).__init__()
