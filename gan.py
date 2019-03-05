@@ -242,15 +242,15 @@ if __name__ == '__main__':
     if args.action == 'train':
         print('Model %s, Src %s, Name %s, size %d, batch %d, iters %d' % (args.model, args.source, args.name, args.image_size, args.batch_size, args.iterations))
         if args.model == 'ps':
-            gan.train_ps_gan(args.source, args.image_size, args.name, args.iterations, args.batch_size)
+            train_ps_gan(args.source, args.image_size, args.name, args.iterations, args.batch_size)
         elif args.model == 'dc':
-            gan.train_dc_gan(args.source, args.name, args.iterations, args.batch_size)
+            train_dc_gan(args.source, args.name, args.iterations, args.batch_size)
         else:
             print('Please select a valid GAN model (ps/dc)')
     elif args.action == 'demo':
         if args.model == 'ps':
-            gan.demo_ps_gan(args.source, args.image_size, args.checkpoint, args.tile)
+            demo_ps_gan(args.source, args.image_size, args.checkpoint, args.tile)
         elif args.model == 'dc':
-            gan.train_dc_gan(args.source, args.checkpoint)
+            train_dc_gan(args.source, args.checkpoint)
         else:
             print('Please select a valid GAN model (ps/dc)')
