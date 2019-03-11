@@ -67,7 +67,6 @@ def generate_texture(source, learning_rate, iterations, image_size=124, tile=Fal
 
 
         #Get the gram matrix's for the noise image
-        noise_layers = get_feature_layers(noise_image, vgg16, layers)
         noise_grams = gram_matrix_layers(noise_layers)
 
         #Calculate the loss and backpropogate
