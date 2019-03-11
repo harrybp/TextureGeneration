@@ -1,11 +1,10 @@
 '''
-Initialisation for GAN application
-Creates necessary directories, 'textures' and 'models'
+Initialisation for the GAN module of the application
+Creates necessary folders: textures and models
 '''
-from pathlib import Path
 import os
+from config import BASE_DIRECTORY
 
-BASE_DIRECTORY = str(Path.home()) + '/texture_generation'
 if not os.path.exists(BASE_DIRECTORY + '/textures'):
     os.makedirs(BASE_DIRECTORY + '/textures')
 if not os.path.exists(BASE_DIRECTORY + '/models'):

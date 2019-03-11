@@ -8,12 +8,12 @@ Methods:
 import os
 import torch
 import torchvision.transforms as transforms
-import config
+from config import BASE_DIRECTORY, DEVICE
 from .models import PSGenerator, DCGenerator
 
-def demo_ps_gan(name, checkpoint=-1, image_size=256, tile=False, filepath='result.jpg'):
+def demo_ps_gan(name, checkpoint=-1, image_size=256, tile=False, filepath='output.jpg'):
     '''
-    Generate an Image using a pre-trained PSGAN model, saves it as result.jpg
+    Generate an Image using a pre-trained PSGAN model, saves it as output.jpg
     Args:
         name:           name of the gan model, (the name of the outer folder containing the training checkpoints)
         image_size:     size of the image to generate
@@ -24,40 +24,40 @@ def demo_ps_gan(name, checkpoint=-1, image_size=256, tile=False, filepath='resul
     transform = None
     if tile:
         transform = transforms.CenterCrop((image_size, image_size))
-    root_directory = 'models/' + name + '/ps'
+    root_directory = BASE_DIRECTORY + '/models/' + name + '/ps'
     if checkpoint < 0:
         checkpoint = 0
         for root, dirs, files in os.walk(root_directory):
             checkpoint += len(dirs)
     root_directory = root_directory + '/' + str(checkpoint)
-    generator = PSGenerator().to(config.device)
+    generator = PSGenerator().to(DEVICE)
     generator.load_state_dict(torch.load(root_directory + '/generator.pt'))
-    noise = generator.noise(1, image_size, tile=tile).to(config.device)
+    noise = generator.noise(1, image_size, tile=tile).to(DEVICE)
     image = generate_image(generator, noise, transform=transform)#
-    image.save(filepath)
+    image.save(BASE_DIRECTORY + '/' + filepath)
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #   Generate an image using a pretrained dc_gan
 #       If checkpoint = -1, most recent checkpoint is used
-def demo_dc_gan(name, checkpoint=-1, filepath='result.jpg'):
+def demo_dc_gan(name, checkpoint=-1, filepath='output.jpg'):
     '''
-    Generate an Image using a pre-trained DCGAN model, saves it as result.jpg
+    Generate an Image using a pre-trained DCGAN model, saves it as output.jpg
     Args:
         name:           name of the gan model, (the name of the outer folder containing the training checkpoints)
         checkpoint:     the training checkpoint to use for generating, (if -1, the most recent checkpoint is used)
         filepath:       the path to which the image will be saved
     '''
-    root_directory = 'models/' + name + '/dc'
+    root_directory = BASE_DIRECTORY + '/models/' + name + '/dc'
     if checkpoint < 0:
         checkpoint = 0
         for root, dirs, files in os.walk(root_directory):
             checkpoint += len(dirs)
     root_directory = root_directory + '/' + str(checkpoint)
-    generator = DCGenerator(100,64,3).to(config.device)
+    generator = DCGenerator(100,64,3).to(DEVICE)
     generator.load_state_dict(torch.load(root_directory + '/generator.pt'))
-    noise = generator.noise(4, 64).to(config.device)
+    noise = generator.noise(4, 64).to(DEVICE)
     image = generate_image(generator, noise)
-    image.save(filepath)
+    image.save(BASE_DIRECTORY + '/' + filepath)
 
 def generate_image(generator, noise, transform=None):
     '''

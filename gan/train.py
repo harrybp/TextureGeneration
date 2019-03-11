@@ -10,7 +10,7 @@ Methods:
 import os
 import torch
 from torch.nn.functional import binary_cross_entropy
-import config
+from config import BASE_DIRECTORY, DEVICE
 from .models import PSGenerator, PSDiscriminator, DCGenerator, DCDiscriminator, initialise_weights
 from .data_loading import get_image_dataloader
 from .generate import generate_image
@@ -28,11 +28,11 @@ def train_ps_gan(source_image, generator_name, image_size=256, iterations=44000,
     '''
     generator = PSGenerator()
     discriminator = PSDiscriminator()
-    dataloader = get_image_dataloader(source_image, image_size, batch_size=batch_size)
+    dataloader = get_image_dataloader(BASE_DIRECTORY + '/textures/' + source_image, image_size, batch_size=batch_size)
     params = {
         'dataloader':           dataloader,
-        'generator':            generator.to(config.device),
-        'discriminator':        discriminator.to(config.device),
+        'generator':            generator.to(DEVICE),
+        'discriminator':        discriminator.to(DEVICE),
         'generator_optim':      torch.optim.Adam(generator.parameters(), lr=5e-5, weight_decay=1e-8, betas=(0.5, 0.999)),
         'discriminator_optim':  torch.optim.Adam(discriminator.parameters(), lr=5e-5, weight_decay=1e-8, betas=(0.5, 0.999)),
         'save_path':            generator_name + '/ps/',
@@ -54,11 +54,11 @@ def train_dc_gan(source_image, generator_name, iterations=44000, batch_size=8, r
     generator = DCGenerator(100, 64, 3).apply(initialise_weights)
     discriminator = DCDiscriminator(64, 3).apply(initialise_weights)
     #dataloader = get_image_dataloader(source_image, 128, image_resize=2, batch_size=batch_size)
-    dataloader = get_image_dataloader(source_image, 64, batch_size=batch_size)
+    dataloader = get_image_dataloader(BASE_DIRECTORY + '/textures/' + source_image, 64, batch_size=batch_size)
     params = {
         'dataloader':           dataloader,
-        'generator':            generator.to(config.device),
-        'discriminator':        discriminator.to(config.device),
+        'generator':            generator.to(DEVICE),
+        'discriminator':        discriminator.to(DEVICE),
         'generator_optim':      torch.optim.Adam(generator.parameters(), lr=0.0002, betas=(0.5, 0.999)),
         'discriminator_optim':  torch.optim.Adam(discriminator.parameters(), lr=0.0002, betas=(0.5, 0.999)),
         'save_path':            generator_name + '/dc/',
@@ -96,9 +96,6 @@ def train_GAN(dataloader, generator, discriminator, generator_optim, discriminat
         iterations:             total number of images trained on
         resume_from:            directory path to checkpoints to resume from (if None no resume is done)
     '''
-    if not os.path.exists('models/' + save_path):
-        os.makedirs('models/' + save_path)
-
     if resume_from is not None:
         generator, discriminator, generator_optim, discriminator_optim = resume(resume_from, generator, discriminator, generator_optim, discriminator_optim)
 
@@ -111,22 +108,22 @@ def train_GAN(dataloader, generator, discriminator, generator_optim, discriminat
     for i in range(epochs):
         for j, data in enumerate(dataloader, 0):
             
-            data = data.to(config.device)
+            data = data.to(DEVICE)
             iterations_until_checkpoint -= data.shape[0]
             total_iterations += data.shape[0]
             
             ## Train with all-real batch
             discriminator_optim.zero_grad() 
             output = discriminator(data) #Run real data through discriminator
-            true_label = torch.full((output.shape), 1, device=config.device)
+            true_label = torch.full((output.shape), 1, device=DEVICE)
             real_discriminator_error = binary_cross_entropy(output, true_label) #Get error from result and target
             real_discriminator_error.backward() #Backpropogate
 
             ## Train with all-fake batch
-            noise = generator.noise(batch_size, image_size).to(config.device)
+            noise = generator.noise(batch_size, image_size).to(DEVICE)
             fake = generator(noise) #Generate fake images from noise with generator
             output = discriminator(fake.detach()) #Run fakes through discriminator
-            false_label = torch.full((output.shape), 0, device=config.device)
+            false_label = torch.full((output.shape), 0, device=DEVICE)
             fake_discriminator_error = binary_cross_entropy(output, false_label) #Get error from result and target
             fake_discriminator_error.backward() #Backpropogate
             discriminator_optim.step()
@@ -134,7 +131,7 @@ def train_GAN(dataloader, generator, discriminator, generator_optim, discriminat
             # Train generator
             generator_optim.zero_grad()
             output = discriminator(fake) #Run fakes through discriminator again
-            true_label = torch.full((output.shape), 1, device=config.device)
+            true_label = torch.full((output.shape), 1, device=DEVICE)
             generator_error = binary_cross_entropy(output, true_label) #Get error from result and target
             generator_error.backward()#Backpropogate
             generator_optim.step()
@@ -152,10 +149,10 @@ def train_GAN(dataloader, generator, discriminator, generator_optim, discriminat
                     save_checkpoint(save_path, saves, generator, discriminator, generator_optim, discriminator_optim, just_generator=False)
                 else: #Save only generator unless its final iteration
                     save_checkpoint(save_path, saves, generator, discriminator, generator_optim, discriminator_optim, just_generator=True)
-                noise = generator.noise(1, image_size).to(config.device)
+                noise = generator.noise(1, image_size).to(DEVICE)
                 with torch.no_grad():
                     image = generate_image(generator, noise)
-                    image.save('in_progress.jpg')
+                    image.save(BASE_DIRECTORY + '/in_progress.jpg')
 
 def save_checkpoint(model_name, checkpoint_number, generator, discriminator, gen_optimiser, disc_optimiser, just_generator=False):
     '''
@@ -171,7 +168,7 @@ def save_checkpoint(model_name, checkpoint_number, generator, discriminator, gen
         just_generator:     if True, only the generator will be saved
     '''
     print('Saving models.. (' + str(checkpoint_number) + ')')
-    directory = 'models/' + model_name + '/' + str(checkpoint_number)
+    directory = BASE_DIRECTORY + '/models/' + model_name + '/' + str(checkpoint_number)
     if not os.path.exists(directory):
         os.makedirs(directory)
     torch.save(generator.state_dict(), directory + '/generator.pt')

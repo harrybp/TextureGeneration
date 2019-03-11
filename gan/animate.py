@@ -11,6 +11,7 @@ import torch
 import numpy as np
 import torchvision.transforms as transforms
 import PIL
+from config import BASE_DIRECTORY
 from .models import PSGenerator
 
 def generate_sin_noise(generator, frames, image_size, tile=False):
@@ -63,7 +64,7 @@ def generate_interpolated_noise(generator, frames, image_size, tile=False):
 
 def generate_gif(gan_name, gan_checkpoint=-1, noise_type='sin', image_size=512, frames=200, frame_duration=70, show_noise=False, tile=False):
     '''
-    Generate an animated GIF using a pretrained generator and save it as test.gif
+    Generate an animated GIF using a pretrained generator and save it as output.gif
     Args:
         gan_name:           the name of the generator to use
         gan_checkpoint:     the training checkpoint of the GAN to use, (if -1, the most recent checkpoint is used)
@@ -75,7 +76,7 @@ def generate_gif(gan_name, gan_checkpoint=-1, noise_type='sin', image_size=512, 
         tile:               whether the GIF should be tileable
     '''
     generator = PSGenerator()
-    root_directory = 'models/' + gan_name + '/ps'
+    root_directory = BASE_DIRECTORY + '/models/' + gan_name + '/ps'
     if gan_checkpoint < 0:
         gan_checkpoint = 0
         for root, dirs, files in os.walk(root_directory):
@@ -95,7 +96,7 @@ def generate_gif(gan_name, gan_checkpoint=-1, noise_type='sin', image_size=512, 
         if show_noise:
             image = concatonate_noise(image, noise_vectors[n])
         images.append(image)
-    images[0].save('test.gif', format='GIF', append_images=images[1:], save_all=True, duration=frame_duration, loop=0)
+    images[0].save(BASE_DIRECTORY + '/output.gif', format='GIF', append_images=images[1:], save_all=True, duration=frame_duration, loop=0)
 
 def concatonate_noise(image, noise):
     '''
