@@ -1,0 +1,6 @@
+numpy==1.16.2
+Pillow==5.4.1
+six==1.12.0
+-e git+https://github.com/harrybp/TextureGeneration.git@7c7e572ce5d42c31faa83db75646879f08f90af7#egg=texture_generation
+torch==1.0.1
+torchvision==0.2.2.post3
