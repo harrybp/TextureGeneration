@@ -14,11 +14,13 @@ Prerequisites:
 
 If you want to change where the application will store models and textures then edit the file `config/__init__.py`
 
-Then simply run `install.sh`.
+Then simply run `install.sh`
 
 ----
 
 ## Generating Textures
+
+Run `python setup.py test` before starting to run the test suite
 
 | Command                  | Result                                                |
 | ------------------------ | ----------------------------------------------------- |
