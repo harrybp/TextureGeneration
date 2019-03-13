@@ -80,7 +80,9 @@ def generate_gif(gan_name, gan_checkpoint=-1, noise_type='sin', image_size=512, 
     if gan_checkpoint < 0:
         gan_checkpoint = 0
         for root, dirs, files in os.walk(root_directory):
-            gan_checkpoint += len(dirs)
+            for dir in dirs:
+                if int(dir) > gan_checkpoint:
+                    gan_checkpoint = int(dir)
     generator.load_state_dict(torch.load(root_directory + '/' + str(gan_checkpoint) + '/generator.pt'))
     if noise_type == 'interpolated':
         noise_vectors = generate_interpolated_noise(generator, frames, image_size, tile)

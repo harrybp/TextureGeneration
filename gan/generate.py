@@ -25,10 +25,12 @@ def demo_ps_gan(name, checkpoint=-1, image_size=256, tile=False, filepath='outpu
     if tile:
         transform = transforms.CenterCrop((image_size, image_size))
     root_directory = BASE_DIRECTORY + '/models/' + name + '/ps'
-    if checkpoint < 0:
+    if checkpoint < 0: #Find most recent checkpoint
         checkpoint = 0
         for root, dirs, files in os.walk(root_directory):
-            checkpoint += len(dirs)
+            for dir in dirs:
+                if int(dir) > checkpoint:
+                    checkpoint = int(dir)
     root_directory = root_directory + '/' + str(checkpoint)
     generator = PSGenerator().to(DEVICE)
     generator.load_state_dict(torch.load(root_directory + '/generator.pt'))
@@ -51,7 +53,9 @@ def demo_dc_gan(name, checkpoint=-1, filepath='output.jpg'):
     if checkpoint < 0:
         checkpoint = 0
         for root, dirs, files in os.walk(root_directory):
-            checkpoint += len(dirs)
+            for dir in dirs:
+                if int(dir) > checkpoint:
+                    checkpoint = int(dir)
     root_directory = root_directory + '/' + str(checkpoint)
     generator = DCGenerator(100,64,3).to(DEVICE)
     generator.load_state_dict(torch.load(root_directory + '/generator.pt'))

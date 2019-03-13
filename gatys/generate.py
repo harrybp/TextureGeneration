@@ -162,7 +162,7 @@ def tile_vertical(source):
         A new image, the same size as the original
     '''
     image_size = source.shape[1]
-    split_point = randint(1, source.shape[1])
+    split_point = randint(1, source.shape[1]-1)
     top_half = source[ :, 0:split_point, : ]
     bottom_half = source[ :, split_point:image_size, : ]
     return torch.cat((bottom_half, top_half), 1)
@@ -176,7 +176,7 @@ def tile_horizontal(source):
         A new image, the same size as the original
     '''
     image_size = source.shape[2]
-    split_point = randint(1, source.shape[2])
+    split_point = randint(1, source.shape[2]-1)
     left_half = source[:, :, 0:split_point]
     right_half = source[:, :, split_point:image_size]
     return torch.cat((right_half, left_half), 2)

@@ -20,7 +20,9 @@ def main():
     parser_train.add_argument('name',  help='checkpoints will be saved under this name')
     parser_train.add_argument('--image_size', nargs='?', const=256, default=256, type=int,   help='size of image to train on')
     parser_train.add_argument('--batch_size', nargs='?', const=8, default=8, type=int, help='how many images to train on concurrently')
-    parser_train.add_argument('--iterations', nargs='?' , const=44000, default=44000, type=int, help='the number of iterations over the training data')
+    parser_train.add_argument('--iterations', nargs='?', const=44000, default=44000, type=int, help='the number of iterations over the training data')
+    parser_train.add_argument('--checkpoint', nargs='?', const=1000, default=1000, type=int, help='the number of iterations between checkpoints - set to -1 to disable checkpoints')
+
     #A
     
     #Demo GAN
@@ -46,9 +48,9 @@ def main():
     if args.action == 'train':
         print('Model %s, Src %s, Name %s, size %d, batch %d, iters %d' % (args.model, args.source, args.name, args.image_size, args.batch_size, args.iterations))
         if args.model == 'ps':
-            train_ps_gan(args.source, args.name, args.image_size, args.iterations, args.batch_size)
+            train_ps_gan(args.source, args.name, image_size=args.image_size, iterations=args.iterations, batch_size=args.batch_size, checkpoint_frequency=args.checkpoint)
         elif args.model == 'dc':
-            train_dc_gan(args.source, args.name, args.iterations, args.batch_size)
+            train_dc_gan(args.source, args.name, iterations=args.iterations, batch_size=args.batch_size, checkpoint_frequency=args.checkpoint)
         else:
             print('Please select a valid GAN model (ps/dc)')
     elif args.action == 'demo':

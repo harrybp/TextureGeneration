@@ -15,16 +15,17 @@ from .models import PSGenerator, PSDiscriminator, DCGenerator, DCDiscriminator, 
 from .data_loading import get_image_dataloader
 from .generate import generate_image
 
-def train_ps_gan(source_image, generator_name, image_size=256, iterations=44000, batch_size=8, resume_from=None):
+def train_ps_gan(source_image, generator_name, image_size=256, iterations=44000, batch_size=8, resume_from=None, checkpoint_frequency=1000):
     '''
     Train a new PSGAN model using random crops of a source image as the training data
     Args:
-        source_image:       the image to train the model on
-        generator_name:     unique name for the model (forms part of the save directory path)
-        image_size:         size of images to be trained on
-        iterations:         total number of images trained on
-        batch_size:         number of images in each training batch
-        resume_from:        directory path to checkpoints to resume from (if None no resume is done)
+        source_image:           the image to train the model on
+        generator_name:         unique name for the model (forms part of the save directory path)
+        image_size:             size of images to be trained on
+        iterations:             total number of images trained on
+        batch_size:             number of images in each training batch
+        resume_from:            directory path to checkpoints to resume from (if None no resume is done)
+        checkpoint_frequency:   how many iterations between every checkpoint (set to -1 to disable checkpoints)
     '''
     generator = PSGenerator()
     discriminator = PSDiscriminator()
@@ -37,19 +38,21 @@ def train_ps_gan(source_image, generator_name, image_size=256, iterations=44000,
         'discriminator_optim':  torch.optim.Adam(discriminator.parameters(), lr=5e-5, weight_decay=1e-8, betas=(0.5, 0.999)),
         'save_path':            generator_name + '/ps/',
         'iterations':           iterations,
-        'resume_from':          resume_from
+        'resume_from':          resume_from,
+        'checkpoint_frequency': checkpoint_frequency
     }
     train_GAN(**params)
 
-def train_dc_gan(source_image, generator_name, iterations=44000, batch_size=8, resume_from=None):
+def train_dc_gan(source_image, generator_name, iterations=44000, batch_size=8, resume_from=None, checkpoint_frequency=1000):
     '''
     Train a new PSGAN model using random crops of a source image as the training data
     Args:
-        source_image:       the image to train the model on
-        generator_name:     unique name for the model (forms part of the save directory path)
-        iterations:         total number of images trained on
-        batch_size:         number of images in each training batch
-        resume_from:        directory path to checkpoints to resume from (if None no resume is done)
+        source_image:           the image to train the model on
+        generator_name:         unique name for the model (forms part of the save directory path)
+        iterations:             total number of images trained on
+        batch_size:             number of images in each training batch
+        resume_from:            directory path to checkpoints to resume from (if None no resume is done)
+        checkpoint_frequency:   how many iterations between every checkpoint (set to -1 to disable checkpoints)
     '''
     generator = DCGenerator(100, 64, 3).apply(initialise_weights)
     discriminator = DCDiscriminator(64, 3).apply(initialise_weights)
@@ -63,7 +66,8 @@ def train_dc_gan(source_image, generator_name, iterations=44000, batch_size=8, r
         'discriminator_optim':  torch.optim.Adam(discriminator.parameters(), lr=0.0002, betas=(0.5, 0.999)),
         'save_path':            generator_name + '/dc/',
         'iterations':           iterations,
-        'resume_from':          resume_from
+        'resume_from':          resume_from,
+        'checkpoint_frequency': checkpoint_frequency
     }
     train_GAN(**params)
 
@@ -83,7 +87,7 @@ def resume(file_path, generator, discriminator, generator_optim, discriminator_o
     return generator, discriminator, generator_optim, discriminator_optim
 
 
-def train_GAN(dataloader, generator, discriminator, generator_optim, discriminator_optim, save_path, iterations, resume_from ):
+def train_GAN(dataloader, generator, discriminator, generator_optim, discriminator_optim, save_path, iterations, resume_from, checkpoint_frequency ):
     '''
     Train a new GAN model
     Args:
@@ -95,13 +99,14 @@ def train_GAN(dataloader, generator, discriminator, generator_optim, discriminat
         save_path:              root directory to save all model checkpoints
         iterations:             total number of images trained on
         resume_from:            directory path to checkpoints to resume from (if None no resume is done)
+        checkpoint_frequency:   how many iterations between every checkpoint (set to -1 to disable checkpoints)
     '''
     if resume_from is not None:
         generator, discriminator, generator_optim, discriminator_optim = resume(resume_from, generator, discriminator, generator_optim, discriminator_optim)
 
     batch_size = dataloader.batch_size
     image_size = dataloader.dataset.image_size
-    iterations_until_checkpoint = 50 #Count how many iterations done
+    iterations_until_checkpoint = checkpoint_frequency #Count how many iterations done
     total_iterations = 0
     saves = 0 #Count how many checkpoints saved
     epochs = int(iterations / len(dataloader.dataset))
@@ -137,18 +142,10 @@ def train_GAN(dataloader, generator, discriminator, generator_optim, discriminat
             generator_optim.step()
 
             print('Iteration %d / %d, Image Batch %d / %d, Disc Loss R&F %f & %f , Gen Loss %f' % (i+1, epochs, j+1, len(dataloader), real_discriminator_error, fake_discriminator_error, generator_error))
-            if (iterations_until_checkpoint < 0) or (i == epochs-1 and j == len(dataloader)-1):
+            if (iterations_until_checkpoint < 0 and checkpoint_frequency > -1) or (i == epochs-1 and j == len(dataloader)-1):
                 saves += 1
-                if total_iterations < 10000:
-                    iterations_until_checkpoint += 50
-                elif total_iterations < 20000:
-                    iterations_until_checkpoint += 150
-                else:
-                    iterations_until_checkpoint += 300
-                if (i == epochs-1 and j == len(dataloader)-1) or saves % 50 == 0:
-                    save_checkpoint(save_path, saves, generator, discriminator, generator_optim, discriminator_optim, just_generator=False)
-                else: #Save only generator unless its final iteration
-                    save_checkpoint(save_path, saves, generator, discriminator, generator_optim, discriminator_optim, just_generator=True)
+                iterations_until_checkpoint = checkpoint_frequency
+                save_checkpoint(save_path, saves, generator, discriminator, generator_optim, discriminator_optim, just_generator=False)
                 noise = generator.noise(1, image_size).to(DEVICE)
                 with torch.no_grad():
                     image = generate_image(generator, noise)
