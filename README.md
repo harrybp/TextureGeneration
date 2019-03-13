@@ -9,12 +9,16 @@ I have implemented two different methods for generating textures using convoluti
 
 ## Installation
 Prerequisites:
-* Python3 with pip (Tested with python 3.6.5 but any python3 version should work okay)
-* PyTorch must be installed by following the instructions [here](https://pytorch.org/)
+* Python3
+* Pip
+* [PyTorch](https://pytorch.org/)
 
-If you want to change where the application will store models and textures then edit the file `config/__init__.py`
+Clone and unzip this repository. 
+Then simply run `pip install TextureGeneration-master`
 
-Then simply run `install.sh`
+**You must have installed PyTorch from [here](https://pytorch.org/) before installing this application.**
+
+If you want to change where the application will store models and textures then edit the file `config/variables.py` prior to installation.
 
 ----
 
