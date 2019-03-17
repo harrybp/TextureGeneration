@@ -1,27 +1,28 @@
 '''
 Provides methods for training new GAN models
 Methods:
-    train_gan:          method for training new GAN models
-    train_ps_gan:       calls train_gan to train a PSGAN model
-    train_dc_gan:       calls train_gan to train a DCGAN model
-    resume:             resumes model state from a saved checkpoint
-    save_checkpoint:    saves model state
+    train_gan:              method for training new GAN models
+    get_args_train_ps_gan:  get arguments to call train_gan to train a PSGAN model
+    get_args_train_dc_gan:  get arguments to call train_gan to train a DCGAN model
+    resume:                 resumes model state from a saved checkpoint
+    save_checkpoint:        saves model state
 '''
 import os
 import torch
 from torch.nn.functional import binary_cross_entropy
 from config import BASE_DIRECTORY, DEVICE
 from .models import PSGenerator, PSDiscriminator, DCGenerator, DCDiscriminator, initialise_weights
-from .data_loading import get_image_dataloader
+from .data_loading import get_dataloader, get_image_dataloader
 from .generate import generate_image
 
-def train_ps_gan(source_image, generator_name, image_size=256, iterations=44000, batch_size=8, resume_from=None, checkpoint_frequency=1000):
+def get_args_train_ps_gan(source_image, generator_name, image_size=256, scaling_factor=1, iterations=44000, batch_size=8, resume_from=None, checkpoint_frequency=1000):
     '''
-    Train a new PSGAN model using random crops of a source image as the training data
+    Generate arguments for train_gan method to train a new PSGAN model using random crops of a source image as the training data
     Args:
         source_image:           the image to train the model on
         generator_name:         unique name for the model (forms part of the save directory path)
         image_size:             size of images to be trained on
+        scaling_factor: image size will be multiplied by this before cropping, set higher to 'zoom out' images
         iterations:             total number of images trained on
         batch_size:             number of images in each training batch
         resume_from:            directory path to checkpoints to resume from (if None no resume is done)
@@ -29,23 +30,23 @@ def train_ps_gan(source_image, generator_name, image_size=256, iterations=44000,
     '''
     generator = PSGenerator()
     discriminator = PSDiscriminator()
-    dataloader = get_image_dataloader(BASE_DIRECTORY + '/textures/' + source_image, image_size, batch_size=batch_size)
+    dataloader = get_dataloader(os.path.join(BASE_DIRECTORY, 'textures', source_image), image_size, scaling_factor=scaling_factor, batch_size=batch_size)
     params = {
         'dataloader':           dataloader,
         'generator':            generator.to(DEVICE),
         'discriminator':        discriminator.to(DEVICE),
         'generator_optim':      torch.optim.Adam(generator.parameters(), lr=5e-5, weight_decay=1e-8, betas=(0.5, 0.999)),
         'discriminator_optim':  torch.optim.Adam(discriminator.parameters(), lr=5e-5, weight_decay=1e-8, betas=(0.5, 0.999)),
-        'save_path':            generator_name + '/ps/',
+        'save_path':            os.path.join(generator_name, 'ps'),
         'iterations':           iterations,
         'resume_from':          resume_from,
         'checkpoint_frequency': checkpoint_frequency
     }
-    train_GAN(**params)
+    return params
 
-def train_dc_gan(source_image, generator_name, iterations=44000, batch_size=8, resume_from=None, checkpoint_frequency=1000):
+def get_args_train_dc_gan(source_image, generator_name, iterations=44000, batch_size=8, resume_from=None, checkpoint_frequency=1000):
     '''
-    Train a new PSGAN model using random crops of a source image as the training data
+    Generate arguments for train_gan method to train a new DCGAN model using random crops of a source image as the training data
     Args:
         source_image:           the image to train the model on
         generator_name:         unique name for the model (forms part of the save directory path)
@@ -56,20 +57,19 @@ def train_dc_gan(source_image, generator_name, iterations=44000, batch_size=8, r
     '''
     generator = DCGenerator(100, 64, 3).apply(initialise_weights)
     discriminator = DCDiscriminator(64, 3).apply(initialise_weights)
-    #dataloader = get_image_dataloader(source_image, 128, image_resize=2, batch_size=batch_size)
-    dataloader = get_image_dataloader(BASE_DIRECTORY + '/textures/' + source_image, 64, batch_size=batch_size)
+    dataloader = get_dataloader(os.path.join(BASE_DIRECTORY, 'textures', source_image), 64, batch_size=batch_size)
     params = {
         'dataloader':           dataloader,
         'generator':            generator.to(DEVICE),
         'discriminator':        discriminator.to(DEVICE),
         'generator_optim':      torch.optim.Adam(generator.parameters(), lr=0.0002, betas=(0.5, 0.999)),
         'discriminator_optim':  torch.optim.Adam(discriminator.parameters(), lr=0.0002, betas=(0.5, 0.999)),
-        'save_path':            generator_name + '/dc/',
+        'save_path':            os.path.join(generator_name, 'dc'),
         'iterations':           iterations,
         'resume_from':          resume_from,
         'checkpoint_frequency': checkpoint_frequency
     }
-    train_GAN(**params)
+    return params
 
 def resume(file_path, generator, discriminator, generator_optim, discriminator_optim):
     '''
@@ -80,14 +80,14 @@ def resume(file_path, generator, discriminator, generator_optim, discriminator_o
     Returns:
         generator, disc...:     the models and optimisers, now with the resumed state
     '''
-    generator.load_state_dict(torch.load(file_path + '/generator.pt'))
-    discriminator.load_state_dict(torch.load(file_path + '/discriminator.pt'))
-    generator_optim.load_state_dict(torch.load(file_path + '/generator_optimiser.pt'))
-    discriminator_optim.load_state_dict(torch.load(file_path + '/generator_optimiser.pt'))
+    generator.load_state_dict(torch.load(os.path.join(file_path, 'generator.pt')))
+    discriminator.load_state_dict(torch.load(os.path.join(file_path, 'discriminator.pt')))
+    generator_optim.load_state_dict(torch.load(os.path.join(file_path, 'generator_optimiser.pt')))
+    discriminator_optim.load_state_dict(torch.load(os.path.join(file_path, 'discriminator_optimiser.pt')))
     return generator, discriminator, generator_optim, discriminator_optim
 
 
-def train_GAN(dataloader, generator, discriminator, generator_optim, discriminator_optim, save_path, iterations, resume_from, checkpoint_frequency ):
+def train_gan(dataloader, generator, discriminator, generator_optim, discriminator_optim, save_path, iterations, resume_from, checkpoint_frequency ):
     '''
     Train a new GAN model
     Args:
@@ -149,7 +149,7 @@ def train_GAN(dataloader, generator, discriminator, generator_optim, discriminat
                 noise = generator.noise(1, image_size).to(DEVICE)
                 with torch.no_grad():
                     image = generate_image(generator, noise)
-                    image.save(BASE_DIRECTORY + '/in_progress.jpg')
+                    image.save(os.path.join(BASE_DIRECTORY, 'in_progress.jpg'))
 
 def save_checkpoint(model_name, checkpoint_number, generator, discriminator, gen_optimiser, disc_optimiser, just_generator=False):
     '''
@@ -165,11 +165,11 @@ def save_checkpoint(model_name, checkpoint_number, generator, discriminator, gen
         just_generator:     if True, only the generator will be saved
     '''
     print('Saving models.. (' + str(checkpoint_number) + ')')
-    directory = BASE_DIRECTORY + '/models/' + model_name + '/' + str(checkpoint_number)
+    directory = os.path.join(BASE_DIRECTORY, 'models', model_name, str(checkpoint_number))
     if not os.path.exists(directory):
         os.makedirs(directory)
-    torch.save(generator.state_dict(), directory + '/generator.pt')
+    torch.save(generator.state_dict(), os.path.join(directory, 'generator.pt'))
     if not just_generator:
-        torch.save(discriminator.state_dict(), directory + '/discriminator.pt')
-        torch.save(gen_optimiser.state_dict(), directory + '/generator_optimiser.pt')
-        torch.save(disc_optimiser.state_dict(), directory + '/discriminator_optimiser.pt')
+        torch.save(discriminator.state_dict(), os.path.join(directory, 'discriminator.pt'))
+        torch.save(gen_optimiser.state_dict(), os.path.join(directory, 'generator_optimiser.pt'))
+        torch.save(disc_optimiser.state_dict(), os.path.join(directory, 'discriminator_optimiser.pt'))

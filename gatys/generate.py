@@ -11,6 +11,7 @@ Methods:
     tile_horizontal:        split an image into randomly sized left and right 'halves' and switch the halves around
 '''
 from random import randint
+import os
 import torch
 import numpy as np
 from torchvision import transforms, models
@@ -19,7 +20,7 @@ from config import DEVICE, BASE_DIRECTORY
 
 NORMALISE = transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
 DE_NORMALISE = transforms.Normalize((-2.12, -2.04, -1.80), (4.37, 4.46, 4.44))
-STYLE_IMAGE_CROP = transforms.RandomCrop((256,256))
+STYLE_IMAGE_CROP = transforms.RandomCrop((256, 256))
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # Creates a texture image as done by gatys et al.
@@ -33,7 +34,7 @@ def generate_texture(source, learning_rate, iterations, image_size=124, tile=Fal
         image_size:     width and height of the output image in pixels
         tile:       whether the finished image should be tileable
     '''
-    source = BASE_DIRECTORY + '/textures/' + source
+    source = os.path.join(BASE_DIRECTORY, 'textures', source)
     vgg16 = models.vgg16(pretrained=True).features.eval().to(DEVICE) #Load in pretrained CNN
 
     #Read in source image and noise image as Tensors and normalise
@@ -75,7 +76,7 @@ def generate_texture(source, learning_rate, iterations, image_size=124, tile=Fal
         optimizer.step()
     
     result = transforms.ToPILImage()(DE_NORMALISE(noise_image.cpu()).clamp(0, 1))
-    result.save(BASE_DIRECTORY + '/result.jpg')
+    result.save(os.path.join(BASE_DIRECTORY, 'output.jpg'))
 
 def gram_matrix(layer):
     '''

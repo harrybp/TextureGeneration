@@ -1,9 +1,9 @@
 '''
 Provides methods for generating images using pretrained GAN models
 Methods:
-    generate_image: uses a pretrained GAN model to generate an image
-    demo_ps_gan:    generate and save an image using pretrained PSGAN
-    demo_dc_gan:    generate and save an image using pretrained DCGAN
+    generate_image:         uses a pretrained GAN model to generate an image
+    get_args_demo_ps_gan:   get arguments for generate_image to generate an image using pretrained PSGAN
+    get_args_demo_dc_gan:   get arguments for generate_image to generate an image using pretrained DCGAN
 '''
 import os
 import torch
@@ -11,57 +11,60 @@ import torchvision.transforms as transforms
 from config import BASE_DIRECTORY, DEVICE
 from .models import PSGenerator, DCGenerator
 
-def demo_ps_gan(name, checkpoint=-1, image_size=256, tile=False, filepath='output.jpg'):
+def get_args_demo_ps_gan(name, checkpoint=-1, image_size=256, tile=False):
     '''
-    Generate an Image using a pre-trained PSGAN model, saves it as output.jpg
+    Get generator & noise to provide to generate_image to generate an Image using a pre-trained PSGAN model
     Args:
         name:           name of the gan model, (the name of the outer folder containing the training checkpoints)
         image_size:     size of the image to generate
         checkpoint:     the training checkpoint to use for generating, (if -1, the most recent checkpoint is used)
         tile:           whether the generated image should be tileable
-        filepath:       the path to which the image will be saved
     '''
     transform = None
     if tile:
         transform = transforms.CenterCrop((image_size, image_size))
-    root_directory = BASE_DIRECTORY + '/models/' + name + '/ps'
+    root_directory = os.path.join(BASE_DIRECTORY, 'models', name, 'ps')
     if checkpoint < 0: #Find most recent checkpoint
         checkpoint = 0
         for root, dirs, files in os.walk(root_directory):
             for dir in dirs:
                 if int(dir) > checkpoint:
                     checkpoint = int(dir)
-    root_directory = root_directory + '/' + str(checkpoint)
+    root_directory = os.path.join(root_directory, str(checkpoint))
     generator = PSGenerator().to(DEVICE)
-    generator.load_state_dict(torch.load(root_directory + '/generator.pt'))
+    generator.load_state_dict(torch.load(os.path.join(root_directory, 'generator.pt')))
     noise = generator.noise(1, image_size, tile=tile).to(DEVICE)
-    image = generate_image(generator, noise, transform=transform)#
-    image.save(BASE_DIRECTORY + '/' + filepath)
+    args={
+        'generator': generator,
+        'noise': noise, 
+        'transform': transform
+        }
+    return args
 
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-#   Generate an image using a pretrained dc_gan
-#       If checkpoint = -1, most recent checkpoint is used
-def demo_dc_gan(name, checkpoint=-1, filepath='output.jpg'):
+def get_args_demo_dc_gan(name, checkpoint=-1):
     '''
-    Generate an Image using a pre-trained DCGAN model, saves it as output.jpg
+    Get generator & noise to provide to generate_image to generate an Image using a pre-trained DCGAN model
     Args:
         name:           name of the gan model, (the name of the outer folder containing the training checkpoints)
         checkpoint:     the training checkpoint to use for generating, (if -1, the most recent checkpoint is used)
-        filepath:       the path to which the image will be saved
     '''
-    root_directory = BASE_DIRECTORY + '/models/' + name + '/dc'
+    root_directory = os.path.join(BASE_DIRECTORY, 'models', name, 'dc')
     if checkpoint < 0:
         checkpoint = 0
         for root, dirs, files in os.walk(root_directory):
             for dir in dirs:
                 if int(dir) > checkpoint:
                     checkpoint = int(dir)
-    root_directory = root_directory + '/' + str(checkpoint)
+    root_directory = os.path.join(root_directory, str(checkpoint))
     generator = DCGenerator(100,64,3).to(DEVICE)
-    generator.load_state_dict(torch.load(root_directory + '/generator.pt'))
+    generator.load_state_dict(torch.load(os.path.join(root_directory, 'generator.pt')))
     noise = generator.noise(4, 64).to(DEVICE)
-    image = generate_image(generator, noise)
-    image.save(BASE_DIRECTORY + '/' + filepath)
+    args={
+        'generator': generator,
+        'noise': noise, 
+        'transform': None
+        }
+    return args
 
 def generate_image(generator, noise, transform=None):
     '''

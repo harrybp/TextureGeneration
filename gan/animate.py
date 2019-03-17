@@ -76,14 +76,14 @@ def generate_gif(gan_name, gan_checkpoint=-1, noise_type='sin', image_size=512, 
         tile:               whether the GIF should be tileable
     '''
     generator = PSGenerator()
-    root_directory = BASE_DIRECTORY + '/models/' + gan_name + '/ps'
+    root_directory = os.path.join(BASE_DIRECTORY, 'models', gan_name, 'ps')
     if gan_checkpoint < 0:
         gan_checkpoint = 0
         for root, dirs, files in os.walk(root_directory):
             for dir in dirs:
                 if int(dir) > gan_checkpoint:
                     gan_checkpoint = int(dir)
-    generator.load_state_dict(torch.load(root_directory + '/' + str(gan_checkpoint) + '/generator.pt'))
+    generator.load_state_dict(torch.load(os.path.join(root_directory, str(gan_checkpoint), 'generator.pt')))
     if noise_type == 'interpolated':
         noise_vectors = generate_interpolated_noise(generator, frames, image_size, tile)
     else:
@@ -98,7 +98,7 @@ def generate_gif(gan_name, gan_checkpoint=-1, noise_type='sin', image_size=512, 
         if show_noise:
             image = concatonate_noise(image, noise_vectors[n])
         images.append(image)
-    images[0].save(BASE_DIRECTORY + '/output.gif', format='GIF', append_images=images[1:], save_all=True, duration=frame_duration, loop=0)
+    images[0].save(os.path.join(BASE_DIRECTORY, 'output.gif'), format='GIF', append_images=images[1:], save_all=True, duration=frame_duration, loop=0)
 
 def concatonate_noise(image, noise):
     '''
@@ -114,9 +114,9 @@ def concatonate_noise(image, noise):
     noise_tensor = torch.Tensor(noise)
     noise_tensor = np.add(noise_tensor, 1)
     noise_tensor *= 1.0/noise_tensor.max()  
-    noise_tensor = noise_tensor.view((4, int(image_size/8), int(image_size/8)))
+    noise_tensor = noise_tensor.view((4, int(image_size/4), int(image_size/4)))
     noise_image = transforms.ToPILImage()(noise_tensor)
-    noise_image = noise_image.resize((image_size,image_size), PIL.Image.NEAREST)   
+    noise_image = noise_image.resize((image_size, image_size), PIL.Image.NEAREST)   
 
     #Create new canvas
     new_image = PIL.Image.new('RGBA', (image_size * 2, image_size))
