@@ -7,6 +7,7 @@ Methods:
     concatonate_noise               attaches a graphical representation of a noise vector to an image
 '''
 import os
+from math import sqrt
 import torch
 import numpy as np
 import torchvision.transforms as transforms
@@ -114,7 +115,8 @@ def concatonate_noise(image, noise):
     noise_tensor = torch.Tensor(noise)
     noise_tensor = np.add(noise_tensor, 1)
     noise_tensor *= 1.0/noise_tensor.max()  
-    noise_tensor = noise_tensor.view((4, int(image_size/4), int(image_size/4)))
+    dimension_size = int(sqrt(noise_tensor.numel()/4))
+    noise_tensor = noise_tensor.view((4, dimension_size, dimension_size))
     noise_image = transforms.ToPILImage()(noise_tensor)
     noise_image = noise_image.resize((image_size, image_size), PIL.Image.NEAREST)   
 
