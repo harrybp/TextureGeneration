@@ -22,7 +22,7 @@ def get_args_train_ps_gan(source_image, generator_name, image_size=256, scaling_
         source_image:           the image to train the model on
         generator_name:         unique name for the model (forms part of the save directory path)
         image_size:             size of images to be trained on
-        scaling_factor: image size will be multiplied by this before cropping, set higher to 'zoom out' images
+        scaling_factor:         image size will be multiplied by this before cropping, set higher to 'zoom out' images
         iterations:             total number of images trained on
         batch_size:             number of images in each training batch
         resume_from:            directory path to checkpoints to resume from (if None no resume is done)
@@ -44,7 +44,7 @@ def get_args_train_ps_gan(source_image, generator_name, image_size=256, scaling_
     }
     return params
 
-def get_args_train_dc_gan(source_image, generator_name, iterations=44000, batch_size=8, resume_from=None, checkpoint_frequency=1000):
+def get_args_train_dc_gan(source_image, generator_name, scaling_factor=1, iterations=44000, batch_size=8, resume_from=None, checkpoint_frequency=1000):
     '''
     Generate arguments for train_gan method to train a new DCGAN model using random crops of a source image as the training data
     Args:
@@ -57,7 +57,7 @@ def get_args_train_dc_gan(source_image, generator_name, iterations=44000, batch_
     '''
     generator = DCGenerator(100, 64, 3).apply(initialise_weights)
     discriminator = DCDiscriminator(64, 3).apply(initialise_weights)
-    dataloader = get_dataloader(os.path.join(BASE_DIRECTORY, 'textures', source_image), 64, batch_size=batch_size)
+    dataloader = get_dataloader(os.path.join(BASE_DIRECTORY, 'textures', source_image), 64, batch_size=batch_size, scaling_factor=scaling_factor)
     params = {
         'dataloader':           dataloader,
         'generator':            generator.to(DEVICE),

@@ -24,9 +24,9 @@ def main():
     args = parser.parse_args()
     if args.action == 'train':
         if args.model == 'ps':
-            params = get_args_train_ps_gan(args.source, args.name, image_size=args.image_size, iterations=args.iterations, batch_size=args.batch_size, checkpoint_frequency=args.checkpoint_frequency, resume_from=args.resume_path)
+            params = get_args_train_ps_gan(args.source, args.name, image_size=args.image_size, scaling_factor=args.scaling_factor, iterations=args.iterations, batch_size=args.batch_size, checkpoint_frequency=args.checkpoint_frequency, resume_from=args.resume_path)
         elif args.model == 'dc':
-            params = get_args_train_dc_gan(args.source, args.name, iterations=args.iterations, batch_size=args.batch_size, checkpoint_frequency=args.checkpoint_frequency, resume_from=args.resume_path)
+            params = get_args_train_dc_gan(args.source, args.name, iterations=args.iterations, scaling_factor=args.scaling_factor, batch_size=args.batch_size, checkpoint_frequency=args.checkpoint_frequency, resume_from=args.resume_path)
         else:
             raise ValueError('Please select a valid GAN model (ps/dc)')
         train_gan(**params)
@@ -55,6 +55,7 @@ def add_train_parser(subparsers):
     parser_train.add_argument('source', help='path to the source image file or source image folder')
     parser_train.add_argument('name', help='checkpoints will be saved under this name')
     parser_train.add_argument('-s', '--image_size', nargs='?', const=256, default=256, type=int, help='size of image to train on')
+    parser_train.add_argument('-f', '--scaling_factor', nargs='?', const=1, default=1, type=int, help='images will be scaled up by this factor before cropping to size')
     parser_train.add_argument('-b', '--batch_size', nargs='?', const=8, default=8, type=int, help='how many images to train on concurrently')
     parser_train.add_argument('-i', '--iterations', nargs='?', const=44000, default=44000, type=int, help='the number of iterations over the training data')
     parser_train.add_argument('-c', '--checkpoint_frequency', nargs='?', const=1000, default=1000, type=int, help='the number of iterations between checkpoints - set to -1 to disable checkpoints')
