@@ -1,6 +1,6 @@
 # Texture Generation using Convolutional Neural Networks
 
-The aim of this project is to explore methods of generating unique, realistic textures without needing a large source dataset.
+The aim of this project is to explore methods of generating unique, realistic or artistic textures without needing a large source dataset.
 I have implemented two different methods for generating textures using convolutional neural networks.
 * Training a GAN to generate textures using two different models: [DCGAN](https://arxiv.org/pdf/1511.06434.pdf) and [PSGAN](https://arxiv.org/pdf/1705.06566.pdf). (The code is designed to be easily extended to support additional generator & discriminator models.)
 * Optimising on image pixels as done by [Gatys et al.](https://arxiv.org/pdf/1505.07376.pdf)
